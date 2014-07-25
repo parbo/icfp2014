@@ -57,10 +57,9 @@ def compile_lambda(body, n, c):
     return ["LDF", compile(body, n, []) + ["RTN"]] + c
 
 def compile_if(test, then_code, else_code, n, c):
-    res = compile(test, n, ["SEL"] + [compile(then_code, n, []) + ["JOIN"]]
-                   + [compile(else_code, n, []) + ["JOIN"]]
-                   + c)
-    return res
+    then_compiled = compile(then_code, n, [])
+    else_compiled = compile(else_code, n, [])
+    return compile(test, n, []) + ["SEL"] + [then_compiled + ["JOIN"]] + [else_compiled + ["JOIN"]] + c
 
 def compile_app(args, n, c):
     if args == []:
@@ -93,64 +92,64 @@ def compile(e, n, c):
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["ADD"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["ADD"] + compile(e, n, c)
             elif fcn == '-' or fcn == 'sub':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["SUB"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["SUB"] + compile(e, n, c)
             elif fcn == '*' or fcn == 'mul':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["MUL"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["MUL"] + compile(e, n, c)
             elif fcn == '/' or fcn == 'div':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["DIV"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["DIV"] + compile(e, n, c)
             elif fcn == 'eq':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["CEQ"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["CEQ"] + compile(e, n, c)
             elif fcn == '>' or fcn == 'gt':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["CGT"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["CGT"] + compile(e, n, c)
             elif fcn == '>=' or fcn == 'geq':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["CGTE"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["CGTE"] + compile(e, n, c)
             elif fcn == '<' or fcn == 'lt':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["CGTE", "LDC", 0, "CEQ"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["CGTE", "LDC", 0, "CEQ"] + compile(e, n, c)
             elif fcn == '<=' or fcn == 'leq':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["CGT", "LDC", 0, "CEQ"] + compile(e, n, c)
+                return compile(arg1, n, c) + compile(arg2, n, []) + ["CGT", "LDC", 0, "CEQ"] + compile(e, n, c)
             elif fcn == 'car':
                 e.pop(0)
                 arg1 = e.pop(0)
-                return compile(arg1, n, c) + ["CAR"] + compile(e, n, c)
+                return compile(arg1, n, []) + ["CAR"] + compile(e, n, c)
             elif fcn == 'cdr':
                 e.pop(0)
                 arg1 = e.pop(0)
-                return compile(arg1, n, c) + ["CDR"] + compile(e, n, c)
+                return compile(arg1, n, []) + ["CDR"] + compile(e, n, c)
             elif fcn == 'cons':
                 e.pop(0)
                 arg1 = e.pop(0)
                 arg2 = e.pop(0)
-                return compile(arg1, n, c) + compile(arg2, n, c) + ["CONS"] + compile(e, n, c)
+                return compile(arg1, n, []) + compile(arg2, n, []) + ["CONS"] + compile(e, n, c)
             elif fcn == 'atom':
                 e.pop(0)
                 arg1 = e.pop(0)
-                return compile(arg1, n, c) + ["ATOM"] + compile(e, n, c)
+                return compile(arg1, n, []) + ["ATOM"] + compile(e, n, c)
             elif fcn == 'lambda':
                 args = e[1:]
                 assert len(args) == 2 # i.e. args == [name list, body]
