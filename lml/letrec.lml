@@ -1,0 +1,5 @@
+(letrec (f) ((lambda (x m)
+			   (if (if (atom x) (eq x 0) 0)
+				   m
+				 (f (cdr x) (add m 1)))))
+		(f (list  1  2  3)  0))
