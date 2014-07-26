@@ -1,0 +1,158 @@
+; Strategy:
+;   normal mode -> random walk if far from lambda man
+;               -> chase if close to lambda man
+;   fright mode -> evade
+
+; Get this ghost's index
+; and store it in memory [200]
+int 3
+mov [200],a
+
+; Get current state
+; vitality  -> [201]
+; direction -> [202]
+int 6
+mov [201],a
+mov [202],b
+
+; PRNG state, seed with ghost index + 1
+jgt #rnd,[100],0
+mov [100],[200]
+inc [100]
+
+; Update state
+rnd:
+mov a,7
+mov b,[100]
+
+rndloop:
+add [100],b
+dec a
+jlt #rndloopend,[100],101
+sub [100],101
+
+rndloopend:
+jgt #rndloop,a,0
+
+; Get current position
+; x -> [203]
+; y -> [204]
+mov a,[200]
+int 5
+mov [203],a
+mov [204],b
+
+; Get lambda man position
+; x -> [205]
+; y -> [206]
+int 1
+mov [205],a
+mov [206],b
+
+; Find horizontal position relative lambda man
+; Horizontal distance to lambda man -> [207]
+; Left of lambda man:  0 -> [208]
+; Right of lambda man: 1 -> [208]
+mov [208],0
+mov [207],[205]
+sub [207],[203]
+
+jlt #vertpos,[203],[205]
+mov [208],1
+mov [207],[203]
+sub [207],[205]
+
+; Find vertical position relative lambda man
+; Vertical distance to lambda man -> [209]
+; Above lambda man: 0 -> [210]
+; Below lambda man: 1 -> [210]
+
+vertpos:
+mov [210],0
+mov [209],[206]
+sub [209],[204]
+jlt #distance,[204],[206]
+mov [210],1
+mov [209],[204]
+sub [209],[206]
+
+distance:
+
+; Total distance -> [212]
+mov [212],[207]
+add [212],[209]
+
+; Find greatest distance
+; Horizontal distance is greater: 0 -> [211]
+; Vertical distance is greater:   2 -> [211]
+
+mov [211],0
+add [211],[208]  ; Use horizontal move (in normal mode)
+jgt #move,[207],[209]
+mov [211],2
+add [211],[210]  ; Use vertical move (in normal mode)
+
+; Total distance -> [212]
+mov [212],[207]
+add [212],[209]
+
+; Select move
+move:
+
+; If invisible, do nothing
+jeq #halt,[201],2
+
+; Movement table for fright mode
+mov [0],0  ; Up
+mov [1],2  ; Down
+mov [2],1  ; Right
+mov [3],3  ; Left
+
+; If fright mode, use the table above
+jeq #domove,[201],1
+
+; In normal mode
+jgt #randommove,[212],10  ; Random walk if distance > 10
+
+; Movement table for normal mode
+mov [0],1  ; Right
+mov [1],3  ; Left
+mov [2],2  ; Down
+mov [3],0  ; Up
+
+; Make the move
+domove:
+mov b,[211]
+mov a,[b]
+int 0
+jeq #halt,0,0
+
+; pick a random move
+randommove:
+mov a,3
+and a,[100]
+int 0
+jeq #halt,0,0
+
+; Send debug output
+; a: index
+; b: vitality
+; c: direction
+; d: x pos
+; e: y pos
+; f: lambda man x pos
+; g: lambda man y pos
+; h: PRNG state
+debug:
+mov a,[200]
+mov b,[201]
+mov c,[202]
+mov d,[203]
+mov e,[204]
+mov f,[205]
+mov g,[206]
+mov h,[100]
+int 8
+
+halt:
+hlt
