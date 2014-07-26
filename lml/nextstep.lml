@@ -1,0 +1,10 @@
+(letrec (nextstep)
+         ((lambda (pos dir)
+              (if (eq dir 0)
+                (tuple (car pos) (- (cdr pos) 1) 0)
+                (if (eq dir 1)
+                   42
+                   (if (eq dir 2)
+                      (tuple (car pos) (+ (cdr pos) 1) 2)
+					  (tuple (- (car pos) 1) (cdr pos) 3))))))
+  (nextstep (tuple 2 3) 0))

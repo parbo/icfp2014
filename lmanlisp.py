@@ -203,6 +203,7 @@ def do_output(program, subs):
             subs.append(code)
             program = program[2:]
         elif program[0] == "SEL":
+            print "subs:", subs
             code = do_output(program[1], subs)
             then_label = len(subs)
             subs.append(code)
