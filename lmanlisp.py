@@ -173,6 +173,10 @@ def compile(e, n, c):
                 list_body = flatten1L([compile(list_item, n, ["CONS"]) for list_item in args][::-1])
                 # int 0 for nil
                 return ["LDC", "0"] + list_body + c
+            elif fcn == 'print':
+                e.pop(0)
+                arg1 = e.pop(0)
+                return compile(arg1, n, []) + ["DBUG"] + compile(arg1, n, []) + compile(e, n, c)
             # elif fcn == 'null':
             #     e.pop(0)
             #     arg1 = e.pop(0)
