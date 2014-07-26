@@ -1,0 +1,5 @@
+(letrec (foo bar baz)
+        ((lambda (n) (+ 4 (bar n)))
+		 (lambda (n) (+ (print n) 3))
+		 (lambda (n) (+ n 5)))
+ (+ (baz 7) (foo 10)))

@@ -1,0 +1,5 @@
+(letrec (init step)
+        ((lambda (ws unused) (tuple 42 step))
+		 (lambda (ai ws) (tuple (+ ai 1) 1)))
+  (init)
+)

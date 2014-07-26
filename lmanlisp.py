@@ -50,9 +50,6 @@ def index(e, n):
 def is_atom(e):
     return e == "nil" or isa(e, int) or isa(e, Symbol)
 
-def flatten1L(x):
-    return [inner for outer in x for inner in outer]
-
 def compile_lambda(body, n, c):
     return ["LDF", compile(body, n, []) + ["RTN"]] + c
 
@@ -66,6 +63,18 @@ def compile_app(args, n, c):
         return c
     else:
         return compile_app(args[0:-1], n, compile(args[-1], n, c))
+
+def compile_tuple(args, n, c):
+    def do_compile_tuple(args, n, calls, c):
+        if args == []:
+            return c + [["CONS"]] * (calls - 1)
+        else:
+            return do_compile_tuple(args[0:-1], n, calls + 1, compile(args[-1], n, c))
+    return do_compile_tuple(args, n, 0, []) + c
+
+def compile_list(args, n, c):
+    # lists are tuples with an extra 0 really
+    return compile_tuple(args + [0], n, c)
 
 def compile(e, n, c):
     # print "e:", e
@@ -85,7 +94,7 @@ def compile(e, n, c):
             except AssertionError:
                 print e, n
                 raise
-            return ["LD"]  + ij  + c
+            return ["LD"]  + ij  + ["; %s"%e] + c
         else:         # constant literal
             return ["LDC", str(e)] + c
     else:
@@ -159,7 +168,6 @@ def compile(e, n, c):
                 assert len(args) == 2 # i.e. args == [name list, body]
                 return compile_lambda(args[1], [args[0]] + n, c)
             elif fcn == 'if':
-                args = e[1:]
                 return compile_if(args[0], args[1], args[2], n, c)
             elif fcn == 'let' or fcn == 'letrec':
                 newn = [args[0]] + n
@@ -170,19 +178,19 @@ def compile(e, n, c):
                 elif fcn == 'letrec':
                     return ["DUM", len(values)] + compile_app(values, newn, compile_lambda(body, newn, ["RAP", len(values)] + c))
             elif fcn == 'list':
-                list_body = flatten1L([compile(list_item, n, ["CONS"]) for list_item in args][::-1])
-                # int 0 for nil
-                return ["LDC", "0"] + list_body + c
+                return compile_list(args, n, c)
+            elif fcn == 'tuple':
+                return compile_tuple(args, n, c)
             elif fcn == 'print':
-                e.pop(0)
-                arg1 = e.pop(0)
-                return compile(arg1, n, []) + ["DBUG"] + compile(arg1, n, []) + compile(e, n, c)
+                thingie = compile(args[0], n, [])
+                res = thingie + ["DBUG"] + thingie + c
+                return res
             # elif fcn == 'null':
             #     e.pop(0)
             #     arg1 = e.pop(0)
             #     return compile(arg1, n, c) + ["LDC", "0", "CEQ"] + compile(e, n, c)
             else:
-                return compile_app(args, n, ["LD"] + index(fcn, n) + ["AP", len(args)] + c)
+                return compile_app(args, n, ["LD"] + index(fcn, n) + ["; %s"%fcn] + ["AP", len(args)] + c)
         else: # an application with nested function
             return compile_app(args, n, compile(fcn, n, ["AP", len(args)] + c))
 
@@ -204,8 +212,8 @@ def do_output(program, subs):
             o.append(["SEL", then_label, else_label])
             program = program[3:]
         elif program[0] == "LD":
-            o.append(["LD", program[1], program[2]])
-            program = program[3:]
+            o.append(["LD", program[1], program[2], program[3]])
+            program = program[4:]
         elif program[0] in ["LDC", "AP", "RAP", "DUM"]:
             o.append([program[0], program[1]])
             program = program[2:]
