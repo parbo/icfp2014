@@ -10,6 +10,7 @@
 # https://github.com/carlohamalainen/pysecd
 
 import sys
+import uuid
 
 Symbol = str
 isa = isinstance
@@ -89,11 +90,8 @@ def compile(e, n, c):
             return ["LDC", "0"] + c
         if isa(e, Symbol):             # variable reference
             ij = index(e, n)
-            try:
-                assert(ij)
-            except AssertionError:
-                print e, n
-                raise
+            print e, n
+            assert(ij)
             return ["LD"]  + ij  + ["; %s"%e] + c
         else:         # constant literal
             return ["LDC", str(e)] + c
@@ -194,22 +192,23 @@ def compile(e, n, c):
         else: # an application with nested function
             return compile_app(args, n, compile(fcn, n, ["AP", len(args)] + c))
 
-def do_output(program, subs):
-    o = []
+def make_label():
+    return "__label_" + str(uuid.uuid4())
+
+def do_output(program, label):
+    o = [label]
+    subs = []
     while program:
         if program[0] == "LDF":
-            code = do_output(program[1], subs)
-            o.append(["LDF", len(subs)])
-            subs.append(code)
+            newlabel = make_label()
+            subs.append(do_output(program[1], newlabel))
+            o.append(["LDF", newlabel])
             program = program[2:]
         elif program[0] == "SEL":
-            print "subs:", subs
-            code = do_output(program[1], subs)
-            then_label = len(subs)
-            subs.append(code)
-            else_label = len(subs)
-            code = do_output(program[2], subs)
-            subs.append(code)
+            then_label = make_label()
+            else_label = make_label()
+            subs.append(do_output(program[1], then_label))
+            subs.append(do_output(program[2], else_label))
             o.append(["SEL", then_label, else_label])
             program = program[3:]
         elif program[0] == "LD":
@@ -221,35 +220,42 @@ def do_output(program, subs):
         else:
             o.append(program[0])
             program = program[1:]
+    for sub in subs:
+        o.extend(sub)
     return o
 
 def output(program):
-    subs = []
-    label = 0
-    o = do_output(program, subs)
-    labels = {}
-    pc = len(o)
-    for i, s in enumerate(subs):
-        labels[i] = pc
-        pc += len(s)
-        s[0].append("; >> label %d"%i)
-        o.extend(s)
+    o = do_output(program, "")
     tagged = []
-    for line, op in enumerate(o):
+    for op in o:
+        print op
         if isa(op, list):
-            if op[0] in ["LDF", "SEL"]:
-                op_labels = [label for label in op[1:] if not isa(label, str)]
-                instructions = [str(labels[label]) for label in op_labels]
-                comments = ["label " + str(label) for label in op_labels]
-                tagged.append(" ".join([op[0]] + instructions + ["; %d "%line] + comments))
-            else:
-                tagged.append(" ".join([op[0]] + [str(arg) for arg in op[1:]] + ["; %d"%line]))
+            tagged.append(" ".join([str(x) for x in op]))
         else:
-            if line == len(o) - 1:
-                tagged.append(op) # no comments on last line?
-            else:
-                tagged.append(op +  " ; %d"%line)
-    return tagged
+            tagged.append(op)
+    print
+    print
+    print tagged
+    print
+    print
+    return labels_to_linums(tagged)
+
+def labels_to_linums(program):
+    ix = 0
+    while ix < len(program):
+        line = program[ix]
+        if line.startswith("__label_"):
+            newprogram = []
+            for i, l in enumerate(program):
+                if i == ix:
+                    continue
+                newprogram.append(l.replace(line, str(ix)))
+            program = newprogram
+        elif len(line) == 0:
+            program = program[0:ix] + program[ix+1:]
+        else:
+            ix += 1
+    return program
 
 def read(s):
     return read_from(tokenize(s))
