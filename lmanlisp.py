@@ -91,7 +91,7 @@ def compile(e, n, c):
             return ["LDC", "0"] + c
         if isa(e, Symbol):             # variable reference
             ij = index(e, n)
-            print e, n
+            #print e, n
             assert(ij)
             return ["LD"]  + ij  + ["; %s"%e] + c
         else:         # constant literal
@@ -229,16 +229,11 @@ def output(program):
     o = do_output(program, "")
     tagged = []
     for op in o:
-        print op
+        #print op
         if isa(op, list):
             tagged.append(" ".join([str(x) for x in op]))
         else:
             tagged.append(op)
-    print
-    print
-    print tagged
-    print
-    print
     return labels_to_linums(tagged)
 
 def labels_to_linums(program):
@@ -267,7 +262,6 @@ def tokenize(s):
     "Convert a string into a list of tokens."
     # remove any comments
     s = re.sub(r';.*', '', s)
-    print s
     # add spaces around all parentheses
     return s.replace('(',' ( ').replace(')',' ) ').split()
 
@@ -297,11 +291,8 @@ def atom(token):
 if __name__=="__main__":
     program = open(sys.argv[1]).read()
     a = parse(program)
-    print a
     names = []
     c = ["RTN"]
     b = compile(a, names, c)
-    print b
     o = output(b)
-    print o
     print "\n".join(o)
