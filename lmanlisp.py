@@ -80,7 +80,11 @@ def compile(e, n, c):
             return ["LDC", "0"] + c
         if isa(e, Symbol):             # variable reference
             ij = index(e, n)
-            assert(ij)
+            try:
+                assert(ij)
+            except AssertionError:
+                print e, n
+                raise
             return ["LD"]  + ij  + c
         else:         # constant literal
             return ["LDC", str(e)] + c
@@ -215,18 +219,23 @@ def output(program):
     for i, s in enumerate(subs):
         labels[i] = pc
         pc += len(s)
-        s[0] += " ; >> label %d"%i
+        s[0].append("; >> label %d"%i)
         o.extend(s)
     tagged = []
     for line, op in enumerate(o):
         if isa(op, list):
             if op[0] in ["LDF", "SEL"]:
-                tagged.append(" ".join([op[0]] + [str(labels[label]) for label in op[1:]] + ["; %d"%line] + ["label " + str(label) for label in op[1:]]))
-#                tagged.append(" ".join([op[0]] + [str(labels[label]) for label in op[1:]] + ["; %d"%line]))
+                op_labels = [label for label in op[1:] if not isa(label, str)]
+                instructions = [str(labels[label]) for label in op_labels]
+                comments = ["label " + str(label) for label in op_labels]
+                tagged.append(" ".join([op[0]] + instructions + ["; %d "%line] + comments))
             else:
                 tagged.append(" ".join([op[0]] + [str(arg) for arg in op[1:]] + ["; %d"%line]))
         else:
-            tagged.append(op +  "; %d"%line)
+            if line == len(o) - 1:
+                tagged.append(op) # no comments on last line?
+            else:
+                tagged.append(op +  " ; %d"%line)
     return tagged
 
 def read(s):
