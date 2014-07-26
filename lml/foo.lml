@@ -2,4 +2,4 @@
         ((lambda (n) (+ 4 (bar n)))
 		 (lambda (n) (+ n 3))
 		 (lambda (n) (+ n 5)))
- (baz 10))
+ (+ (baz 7) (foo 10)))
