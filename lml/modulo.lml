@@ -1,0 +1,2 @@
+(letrec (modulo) ((lambda (a b) (- a  (* b (div a b)))))
+(modulo 42 10))

@@ -1,9 +1,12 @@
-(letrec (init map lman lmanpos lmandir turncw turnccw step mapobj findx nextstep)
+(letrec (init modulo random map lman lmanpos lmandir mapobjdir turncw turnccw step mapobj findx nextstep)
   ((lambda (ws unused) (tuple 42 step))
+   (lambda (a b) (- a  (* b (div a b))))
+   (lambda (seed) (modulo (* 7 seed) 101))
    (lambda (ws) (car ws))
    (lambda (ws) (car (cdr ws)))
    (lambda (ws) (car (cdr (lman ws))))
    (lambda (ws) (car (cdr (cdr (lman ws)))))
+   (lambda (ws dir) (mapobj (map ws) (nextstep (lmanpos ws) dir)))
    (lambda (dir) (let (newdir) ((+ 1 dir))
                       (if (> newdir 3)
                           0
@@ -12,12 +15,20 @@
                       (if (< newdir 0)
                           3
                         newdir)))
-   (lambda (ai ws) (tuple 42
+   (lambda (ai ws) (tuple (random (print ai))
                           ;; Get the map object in the direction we're facing
                           (let (obj) ((mapobj (map ws) (nextstep (lmanpos ws) (lmandir ws))))
                                (if (eq obj 0)
-                                   ;; At a wall? Just turn clockwise
-                                   (turncw (lmandir ws))
+                                   ;; At a wall? Turn towards pills
+                                   (letrec (turnuntilpill) ((lambda (currdir startdir)
+                                                              (let (newdir) ((turncw currdir))
+                                                                   (if (eq newdir startdir)
+                                                                       currdir
+                                                                     (let (newobj) ((mapobj (map ws) (nextstep (lmanpos ws) newdir)))
+                                                                          (if (eq (print newobj) 2) ;; pill
+                                                                              newdir
+                                                                            (turnuntilpill newdir startdir)))))))
+                                           (turnuntilpill (modulo ai 4) (modulo ai 4))) ;; Use "random" direction
                                  ;; Not facing a wall, just keep on going
                                  (lmandir ws)))))
    (lambda (map pos)
