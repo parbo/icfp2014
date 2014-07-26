@@ -17,20 +17,27 @@
                         newdir)))
    (lambda (ai ws) (tuple (random (print ai))
                           ;; Get the map object in the direction we're facing
-                          (let (obj) ((mapobj (map ws) (nextstep (lmanpos ws) (lmandir ws))))
-                               (if (eq obj 0)
-                                   ;; At a wall? Turn towards pills
-                                   (letrec (turnuntilpill) ((lambda (currdir startdir)
-                                                              (let (newdir) ((turncw currdir))
-                                                                   (if (eq newdir startdir)
-                                                                       currdir
-                                                                     (let (newobj) ((mapobj (map ws) (nextstep (lmanpos ws) newdir)))
-                                                                          (if (eq (print newobj) 2) ;; pill
-                                                                              newdir
-                                                                            (turnuntilpill newdir startdir)))))))
-                                           (turnuntilpill (modulo ai 4) (modulo ai 4))) ;; Use "random" direction
-                                 ;; Not facing a wall, just keep on going
-                                 (lmandir ws)))))
+                          (let (obj old) ((mapobj (map ws) (nextstep (lmanpos ws) (lmandir ws)))
+                                          (mapobj (map ws) (lmanpos ws)))
+                               (letrec (turnuntilpill) ((lambda (currdir startdir)
+                                                          (let (newdir) ((turncw currdir))
+                                                               (if (eq newdir startdir)
+                                                                   currdir
+                                                                 (let (newobj) ((mapobj (map ws) (nextstep (lmanpos ws) newdir)))
+                                                                      (if (eq (print newobj) 2) ;; pill
+                                                                          newdir
+                                                                        (turnuntilpill newdir startdir)))))))
+                                       (if (eq obj 0)
+                                           ;; At a wall? Turn towards pills
+                                           (turnuntilpill (modulo ai 4) (modulo ai 4)) ;; Use "random" direction
+                                         (if (eq obj 1)
+                                             (if (eq old 1)
+                                                 ;; Keep going if we were in an empty spot
+                                                 (lmandir ws)
+                                                 ;; Moving in to an empty spot? Turn towards pills
+                                                 (turnuntilpill (modulo ai 4) (modulo ai 4))) ;; Use "random" direction
+                                           ;; Not facing a wall, just keep on going
+                                           (lmandir ws)))))))
    (lambda (map pos)
      (let (x y) ((car pos) (cdr pos))
           (if (eq y 0)
