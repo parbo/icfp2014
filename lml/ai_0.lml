@@ -52,10 +52,12 @@
         (lambda (g)
           (if (atom g)
               g
-            (cons (car (cdr (car g))) ;; The position of the first ghost in the list
-                  (getpos (cdr g))))))  ;; recursively get the other positions
+            (if (eq (car (car g)) 0) ;; standard ghost
+                (cons (car (cdr (car g))) ;; The position of the first ghost in the list
+                      (getpos (cdr g)))
+              (getpos (cdr g))))))
        (getpos ghosts)))
-   ;; ghostdist: given list of ghost positions and a position, return list of (manhattandistance, directions) tuples
+   ;; ghostdist: given list of ghost statuses and a position, return list of (manhattandistance, directions) tuples
    ;;            note: the direction is the direction away from the ghost
    (lambda (gl pos)
      (letrec (getmdd)
@@ -92,7 +94,10 @@
                                                               (turnuntilpill (turncw currdir) (+ calls 1)))))))
                                   (if (eq obj 0)
                                       ;; At a wall? Turn towards pills
-                                      (turnuntilpill (modulo ai 4) 0) ;; Use "random" direction
+                                      (let (maybedir) ((turnuntilpill (modulo ai 4) 0)) ;; Use "random" direction
+                                           (if (eq maybedir (modulo (+ (lmandir ws) 2) 4))
+                                               (turnuntilpill (lmandir ws) 0) ;; try again with non-random directions
+                                             maybedir))
                                     ;; Not at a wall? Maybe turn anyway
                                     (if (eq obj 1)
                                         (let (maybedir) ((turnuntilpill (modulo ai 4) 0))
