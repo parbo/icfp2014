@@ -9,6 +9,7 @@
 # http://carlo-hamalainen.net/stuff/bfpg-mini-lisp/slides-2013-05-28.pdf
 # https://github.com/carlohamalainen/pysecd
 
+import re
 import sys
 import uuid
 
@@ -264,6 +265,10 @@ parse = read
 
 def tokenize(s):
     "Convert a string into a list of tokens."
+    # remove any comments
+    s = re.sub(r';.*', '', s)
+    print s
+    # add spaces around all parentheses
     return s.replace('(',' ( ').replace(')',' ) ').split()
 
 def read_from(tokens):

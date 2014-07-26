@@ -5,12 +5,15 @@
    (lambda (ws) (car (cdr (lman ws))))
    (lambda (ws) (car (cdr (cdr (lman ws)))))
    (lambda (ai ws) (tuple 42
+                          ;; Get the map object in the direction we're facing
                           (let (obj) ((mapobj (map ws) (nextstep (lmanpos ws) (lmandir ws))))
                                (if (eq obj 0)
+                                   ;; At a wall? Just turn clockwise
                                    (let (newdir) ((+ 1 (lmandir ws)))
                                         (if (> (print newdir) 3)
                                             0
                                           newdir))
+                                 ;; Not facing a wall, just keep on going
                                  (lmandir ws)))))
    (lambda (map pos)
      (let (x y) ((car pos) (cdr pos))
