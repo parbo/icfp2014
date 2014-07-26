@@ -1,0 +1,140 @@
+(letrec (init modulo random map lman lmanpos lmandir mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist flee step mapobj findx nextstep)
+  (
+   ;; init: returns the seed for the PRG, and the step function
+   (lambda (ws unused) (tuple 42 step))
+   ;; modulo: is a % b
+   (lambda (a b) (- a  (* b (div a b))))
+   ;; random: is a pseudo random generator
+   (lambda (seed) (modulo (* 7 seed) 101))
+   ;; map: given world state, returns the map
+   (lambda (ws) (car ws))
+   ;; lman: given world state returns the lambda-man's state
+   (lambda (ws) (car (cdr ws)))
+   ;; lmanpos: given world state returns the position of lambda-man
+   (lambda (ws) (car (cdr (lman ws))))
+   ;; lmandir: given world state returns the position of lambda-man
+   (lambda (ws) (car (cdr (cdr (lman ws)))))
+   ;; mapobjdir: given world state and a direction, returns what's on the map in that direction for lambda-man
+   ;; FIXME: something is wrong with this..
+   (lambda (ws dir) (mapobj (map ws) (nextstep (lmanpos ws) dir)))
+   ;; turncw: given a direction, returns the next clock-wise direction
+   (lambda (dir) (let (newdir) ((+ 1 dir))
+                      (if (> newdir 3)
+                          0
+                        newdir)))
+   ;; turnccw: given a direction, returns the next counter clock-wise direction
+   (lambda (dir) (let (newdir) ((- dir 1))
+                      (if (< newdir 0)
+                          3
+                        newdir)))
+   ;; mhdist: given two positions, return manhattan distance
+   (lambda (p1 p2)
+     (let (x1 y1 x2 y2) ((car p1) (cdr p1) (car p2) (cdr p2))
+          (if (> x1 x2)
+              (if (> y1 y2)
+                  (+ (- x1 x2) (- y1 y2))
+                  (+ (- x1 x2) (- y2 y1)))
+              (if (> y1 y2)
+                  (+ (- x2 x1) (- y1 y2))
+                  (+ (- x2 x1) (- y2 y1))))))
+   ;; abs: returns absolute value
+   (lambda (x)
+     (if (< x 0) (* x -1) x))
+   ;; dirfrom: given two positions, return a pair of general directions (up, down, left right)
+   (lambda (p1 p2)
+     (let (x1 y1 x2 y2) ((car p1) (cdr p1) (car p2) (cdr p2))
+          (let (xdist ydist) ((- x1 x2) (- y1 y2))
+               (tuple (if (> xdist 0) 3 1) (if (> ydist 0) 0 2)))))
+   ;; ghostpos: given world state, returns list of ghosts' positions
+   (lambda (ws)
+     (letrec (ghosts getpos)
+       ((car (cdr (cdr ws)))
+        (lambda (g)
+          (if (atom g)
+              g
+            (cons (car (cdr (car g))) ;; The position of the first ghost in the list
+                  (getpos (cdr g))))))  ;; recursively get the other positions
+       (getpos ghosts)))
+   ;; ghostdist: given list of ghost positions and a position, return list of (manhattandistance, directions) tuples
+   ;;            note: the direction is the direction away from the ghost
+   (lambda (gl pos)
+     (letrec (getmdd)
+       ((lambda (g)
+          (if (atom g)
+              g
+            (cons (tuple (mhdist (car g) pos) (dirfrom (car g) pos))
+                  (getmdd (cdr g) pos)))))
+       (getmdd gl pos)))
+   ;; flee: given the world state, returns the direction tuple to flee or -1 if there is no need to flee
+   (lambda (ws)
+     (letrec (getdir)
+       ((lambda (g)
+          (if (atom g)
+              -1
+            (if (< (car (car g)) 4) ;; flee if ghost is closer than this
+                (cdr (car g))
+              (getdir (cdr g))))))
+       (getdir (ghostdist (ghostpos ws) (lmanpos ws)))))
+   ;; step: this is the main ai function, it takes the current ai state and the world state,
+   ;; and returns the new ai state and the new direction for lambda-man
+   (lambda (ai ws)
+     (tuple (random ai)
+            (let (fleedir) ((print (flee ws)))
+                 (if (atom fleedir)
+                     ;; No need to flee. Get the map object in the direction we're facing
+                     (let (obj) ((mapobj (map ws) (nextstep (lmanpos ws) (lmandir ws))))
+                          (letrec (turnuntilpill) ((lambda (currdir calls)
+                                                     (if (eq calls 4) ;; break out of "loop"
+                                                         currdir
+                                                       (let (newobj) ((mapobj (map ws) (nextstep (lmanpos ws) currdir)))
+                                                            (if (eq newobj 2) ;; pill
+                                                                currdir
+                                                              (turnuntilpill (turncw currdir) (+ calls 1)))))))
+                                  (if (eq obj 0)
+                                      ;; At a wall? Turn towards pills
+                                      (turnuntilpill (modulo ai 4) 0) ;; Use "random" direction
+                                    ;; Not at a wall? Maybe turn anyway
+                                    (if (eq obj 1)
+                                        (let (maybedir) ((turnuntilpill (modulo ai 4) 0))
+                                             (let (maybeobj) ((mapobj (map ws) (nextstep (lmanpos ws) maybedir)))
+                                                  (if (eq maybeobj 2)
+                                                      maybedir
+                                                    (lmandir ws))))
+                                      (lmandir ws)))))
+                   ;; Flee! But not into a wall!
+                   (let (d1 d2) ((car fleedir) (cdr fleedir))
+                        (let (dobj1 dobj2) ((mapobj (map ws) (nextstep (lmanpos ws) d1))
+                                            (mapobj (map ws) (nextstep (lmanpos ws) d2)))
+                             (if (eq dobj1 0)
+                                 (if (eq dobj2 0)
+                                     ;; aagh
+                                     (modulo (+ d1 2) 4) ;; return opposite direction
+                                   d2)
+                               d1)))
+                   )
+                 )
+            )
+     )
+   ;; mapobj: access the map at a certain position
+   (lambda (map pos)
+     (let (x y) ((car pos) (cdr pos))
+          (if (eq y 0)
+              (findx (car map) x)
+            (mapobj (cdr map) (tuple x (- y 1))))))
+   ;; findx: helper for mapobj (could probably be local to mapobj)
+   (lambda (row x)
+     (if (eq x 0)
+         (car row)
+       (findx (cdr row) (- x 1))))
+   ;; nextstep: given a position and a direction, it returns the new position
+   (lambda (pos dir)
+     (let (x y) ((car pos) (cdr pos))
+          (if (eq dir 0)
+              (tuple x (- y 1))
+            (if (eq dir 1)
+                (tuple (+ x 1) y)
+              (if (eq dir 2)
+                  (tuple x (+ y 1))
+                (tuple (- x 1) y)))))))
+  (init)
+  )
