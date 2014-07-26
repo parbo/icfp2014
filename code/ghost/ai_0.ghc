@@ -61,9 +61,13 @@ sub [209],[206]
 distance:
 mov [211],0
 add [211],[208]  ; Use horizontal move (in normal mode)
+mov [212],2
+add [212],[210]  ; Use vertical move as alternative
 jgt #move,[207],[209]
 mov [211],2
 add [211],[210]  ; Use vertical move (in normal mode)
+mov [212],0
+add [212],[208]  ; Use horizontal move as alternative
 
 ; Select move
 move:
@@ -78,7 +82,7 @@ mov [2],1  ; Right
 mov [3],3  ; Left
 
 ; If fright mode, use the table above
-jeq #domove,[201],1
+jeq #trymove,[201],1
 
 ; Movement table for normal mode
 mov [0],1  ; Right
@@ -86,10 +90,36 @@ mov [1],3  ; Left
 mov [2],2  ; Down
 mov [3],0  ; Up
 
-; Make the move
+; Try the move
+trymove:
+mov c,[211]
+mov d,[c]
+
+; New position
+mov a,[203]  ; x
+mov b,[204]  ; y
+mov e,d
+and e,1
+jeq #vertical_move,e,0
+; Horizontal move
+sub a,d
+add a,2
+jeq #test_valid_move,0,0
+vertical_move:
+add b,d
+sub b,1
+
+test_valid_move:
+int 7
+jeq #alternate_move,a,0  ; Is the new position a wall?
+jeq #domove,0,0
+
+alternate_move:
+mov c,[212]
+mov d,[c]
+
 domove:
-mov b,[211]
-mov a,[b]
+mov a,d
 int 0
 
 jeq #halt,0,0
