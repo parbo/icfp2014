@@ -65,7 +65,7 @@ def compile_app(args, n, c):
     if args == []:
         return c
     else:
-        return compile_app(args[1:], n, compile(args[0], n, c))
+        return compile_app(args[0:-1], n, compile(args[-1], n, c))
 
 def compile(e, n, c):
     # print "e:", e
