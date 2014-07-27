@@ -6,7 +6,7 @@
 ;;  * 4: Fruit location
 ;;  * 5: Lambda-Man starting position
 ;;  * 6: Ghost starting position
-(letrec (init modulo random opposite map lman lmanvit lmanpos lmandir mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist flee moves sort transform sortedmoves filterdir filterobj findpills sameasfirst shuffle step mapobj findx nextstep)
+(letrec (init modulo random opposite map lman lmanvit lmanpos lmandir anyfruit mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist search flee moves sort transform sortedmoves filterdir filterobj findpills sameasfirst shuffle step mapobj findx nextstep)
   (
    ;; init: returns the seed for the PRG, and the step function
    (lambda (ws unused) (tuple 42 step))
@@ -27,6 +27,8 @@
    (lambda (ws) (car (cdr (lman ws))))
    ;; lmandir: given world state returns the position of lambda-man
    (lambda (ws) (car (cdr (cdr (lman ws)))))
+   ;; anyfruit: given world state returns the fruit status
+   (lambda (ws) (cdr (cdr (cdr ws))))
    ;; mapobjdir: given world state and a direction, returns what's on the map in that direction for lambda-man
    ;; FIXME: something is wrong with this..
    (lambda (ws dir) (mapobj (map ws) (nextstep (lmanpos ws) dir)))
@@ -70,25 +72,56 @@
                       (getpos (cdr g)))
               (getpos (cdr g))))))
        (getpos ghosts)))
-   ;; ghostdist: given list of ghost statuses and a position, return list of (manhattandistance, directions) tuples
+   ;; ghostdist: given list of ghost statuses and a position, return list of (manhattandistance, directions, position) tuples
    ;;            note: the direction is the direction away from the ghost
    (lambda (gl pos)
      (letrec (getmdd)
        ((lambda (g)
           (if (atom g)
               g
-            (cons (tuple (mhdist (car g) pos) (dirfrom (car g) pos))
+            (cons (tuple (mhdist (car g) pos) (dirfrom (car g) pos) (car g))
                   (getmdd (cdr g) pos)))))
        (getmdd gl pos)))
+   ;; search: do a breadth-first search for pos2 from pos1, and limit after limit moves. Returns a list of path lengths.
+   (lambda (ws pos1 pos2 max)
+     (letrec (dosearch expand lte)
+       ((lambda (p1 p2 depth limit sofar)
+          (if (eq depth limit)
+              sofar
+            (if (eq (mapobj (map ws) p1) 0) ; wall
+                sofar
+              (if (eq (car p1) (car p2))
+                  (if (eq (cdr p1) (cdr p2))
+                      (cons depth sofar)
+                    (expand p1 p2 (+ depth 1) limit sofar))
+                (expand p1 p2 (+ depth 1) limit sofar)))))
+        (lambda (pp1 pp2 d l sf)
+          (let (nsf0) ((dosearch (nextstep pp1 0) pp2 d l sf))
+               (let (nsf1) ((dosearch (nextstep pp1 1) pp2 d l nsf0))
+                    (let (nsf2) ((dosearch (nextstep pp1 2) pp2 d l nsf1))
+                         (dosearch (nextstep pp1 3) pp2 d l nsf2)))))
+        (lambda (a b)
+          (<= a b)))
+       (sort (dosearch pos1 pos2 0 max 0) lte)))
    ;; flee: given the world state, returns the direction tuple to flee or -1 if there is no need to flee
    (lambda (ws)
      (letrec (getdir)
        ((lambda (g)
           (if (atom g)
               -1
-            (if (< (car (car g)) 4) ;; flee if ghost is closer than this
-                (cdr (car g))
-              (getdir (cdr g))))))
+            (let (mh dirs pos)
+              ((car (car g))
+               (car (cdr (car g)))
+               (cdr (cdr (car g))))
+                 (if (< mh 4) ;; maybe flee if ghost is closer than this
+                     ;; do an exhaustive search with max depth 4
+                     (let (paths) ((print (search ws pos (lmanpos ws) 4)))
+                          (if (atom paths)
+                              ;; no path found, we're safe
+                              (getdir (cdr g))
+                            ;; aagh, flee!
+                            (car (cdr (car g)))))
+                   (getdir (cdr g)))))))
        (getdir (ghostdist (ghostpos ws) (lmanpos ws)))))
    ;; moves: given world state, returns a list of map objects and their directions (walls are excluded)
    (lambda (ws)
@@ -136,7 +169,7 @@
             (dosort lst pred))))
        (dosort unsorted predicate)))
    ;; transform: transforms list of (obj dir) to a list of (desirability dir)
-   (lambda (movelist)
+   (lambda (movelist fruit)
      (letrec (dotrans transform)
        ((lambda (lst)
           (if (atom lst)
@@ -145,7 +178,9 @@
         (lambda (a)
           (let (obj dir) ((car a) (cdr a))
                (if (eq obj 4)
-                   (cons 10 dir)
+                   (if (eq fruit 0)
+                       (cons 40 dir)  ; if no fruit, treat as empty
+                     (cons 10 dir))
                  (if (eq obj 3)
                      (cons 20 dir)
                    (if (eq obj 2)
@@ -159,11 +194,11 @@
                            (cons 70 dir))))))))))
         (dotrans movelist)))
    ;; sortedmoves: given list of moves, sort them in (fruit, power pill, pill, (empty, lambda-man-start, ghost-start), wall) order
-   (lambda (movelist)
+   (lambda (movelist fruit)
      (letrec (pred)
        ((lambda (a b)
           (<= (car a) (car b))))
-       (sort (transform movelist) pred)))
+       (sort (transform movelist fruit) pred)))
    ;; filterdir: given list of moves and a dir, return list without it
    (lambda (movelist dir)
      (letrec (dofilter)
@@ -282,7 +317,7 @@
    ;; and returns the new ai state and the new direction for lambda-man
    (lambda (ai ws)
      (tuple (random ai)
-            (let (fleedir movelist currdir rnd) ((flee ws) (print (sortedmoves (moves ws))) (print (lmandir ws)) (modulo ai 2))
+            (let (fleedir movelist currdir rnd) ((flee ws) (print (sortedmoves (moves ws) (anyfruit ws))) (print (lmandir ws)) (modulo ai 2))
                  (let (validmoves)
                    ((if (atom fleedir)
                         ;; No need to flee. Use the whole movelist
