@@ -38,7 +38,7 @@ class Parser(object):
             try:
                 parsed_line = self.parse_line(line)
                 parsed_line['CODE'] = line.rstrip()
-                parsed_line['NBR'] = line_nbr
+                parsed_line['NBR'] = line_nbr + 1
                 self._lines.append(parsed_line)
                 line_type = parsed_line['TYPE']
                 if line_type == 'COMMAND':

@@ -318,11 +318,20 @@ class Simulator(object):
 
     def step(self, n=1):
         for i in range(n):
-            cmd = self._next_cmd['COMMAND']
-            args = self._next_cmd['ARGS']
-            cmd_handler = self._cmd_handler[cmd]
-            cmd_handler(args)
-            self._instruction_count += 1
+            if not self._halt:
+                cmd = self._next_cmd['COMMAND']
+                args = self._next_cmd['ARGS']
+                cmd_handler = self._cmd_handler[cmd]
+                cmd_handler(args)
+                self._instruction_count += 1
+
+    def run_to_line(self, nbr):
+        while not self._halt and nbr != self._next_cmd['NBR']:
+            self.step()
+
+    def run_to_pc(self, pc):
+        while not self._halt and pc != self._pc:
+            self.step()
 
     def run_interactive(self):
         self.install_interactive_irq_handlers()
@@ -331,8 +340,39 @@ class Simulator(object):
             os.system('cls' if os.name == 'nt' else 'clear')
             print self.state_str()
             print
+            if cmd == 'h':
+                print 'enter     step'
+                print 'b <pc>    run and break at pc'
+                print 'g <line>  run to line (source)'
+                print 's <n>     run n steps'
+                print
+                print 'h         show help'
+                print 'q         quit'
+                print
             cmd = raw_input('> ')
-            self.step()
+            if cmd == '':
+                self.step()
+            elif cmd.startswith('b'):
+                try:
+                    pc = int(cmd[1:])
+                except ValueError:
+                    pass
+                else:
+                    self.run_to_pc(pc)
+            elif cmd.startswith('g'):
+                try:
+                    line = int(cmd[1:])
+                except ValueError:
+                    pass
+                else:
+                    self.run_to_line(line)
+            elif cmd.startswith('s'):
+                try:
+                    n = int(cmd[1:])
+                except ValueError:
+                    pass
+                else:
+                    self.step(n)
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
