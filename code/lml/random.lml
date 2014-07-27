@@ -1,0 +1,4 @@
+(letrec (modulo random)
+  ((lambda (a b) (- a  (* b (div a b))))
+   (lambda (seed) (random (modulo (* 7 (print seed)) 101))))
+  (random 42))

@@ -1,0 +1,31 @@
+(letrec (sort checkagain lte)
+  ((lambda (lst pred)
+    ; Boundary case, if the input is an nil list
+    (if (atom lst)
+        lst
+      ; Base case, if the list contains 1 number
+      (if (atom (cdr lst))
+          lst
+       ; Recursive case, check the first bubble -- the first two numbers in the list
+       ; If the first number <= second number, sort the list starting at the second number
+       ; Beware that the recursive call to sort can return a list with the first number smaller
+       ; than the current first number in the list. Hence, call a function 'check-again' to ensure
+       ; the list is correctly sorted. This is what the bubble sort do when flipping the numbers among 
+       ; bubbles.
+        (if (pred (car lst) (car (cdr lst)))
+            (checkagain
+             (cons (car lst)
+                   (sort (cdr lst) pred))
+             pred)
+          ; If the first number > second number, swap the first two numbers and sort the list
+          ; starting at the current second number
+          (checkagain
+           (cons (car (cdr lst))
+                 (sort (cons (car lst) (cdr (cdr lst))) pred))
+           pred)))))
+   (lambda (lst pred)
+     (if (pred (car lst) (car (cdr lst)))
+         lst
+       (sort lst pred)))
+   (lambda (a b) (<= a b)))
+  (sort (list 3 7 6 2 1 6 8 9 4 2) lte))
