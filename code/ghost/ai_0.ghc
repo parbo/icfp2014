@@ -75,11 +75,11 @@ move:
 ; If invisible, do nothing
 jeq #halt,[201],2
 
-; Movement table for fright mode
-mov [0],0  ; Up
-mov [1],2  ; Down
-mov [2],1  ; Right
-mov [3],3  ; Left
+; Movement table for fright mode (opposite of normal mode)
+mov [0],3  ; Left
+mov [1],1  ; Right
+mov [2],0  ; Up
+mov [3],2  ; Down
 
 ; If fright mode, use the table above
 jeq #trymove,[201],1

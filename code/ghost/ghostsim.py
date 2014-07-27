@@ -33,14 +33,17 @@ class Simulator(object):
             'HLT': self._ch_hlt}
         self._irq_handler = dict([(irq, self._irqh_nop) for irq in range(IRQ_NBR)])
 
-    def reset(self):
+    def reset(self, keep_program=False):
         self._halt = False
         self._memory = 256 * [0]
         self._reg = dict([(c, 0) for c in REGISTERS])
         self._pc = 0
-        self._next_cmd = None
         self._instruction_count = 0
-        self._program = []
+        if keep_program:
+            self._next_cmd = self._program[0]
+        else:
+            self._next_cmd = None
+            self._program = []
 
     def load(self, program):
         self.reset()
@@ -66,9 +69,12 @@ class Simulator(object):
         s.append('pc[%4d]: %s' % (self._pc, ghost.Parser.command_str(self._next_cmd)))
         return '\n'.join(s)
 
-    def install_interactive_irq_handlers(self):
+    def set_interactive_irq_handlers(self):
         for irq in range(IRQ_NBR):
             self._irq_handler[irq] = getattr(self, '_irqh_interactive_%d' % irq)
+
+    def set_irq_handler(self, irq, handler):
+        self._irq_handler[irq] = handler
 
     def _irqh_nop(self, reg):
         pass
@@ -325,6 +331,10 @@ class Simulator(object):
                 cmd_handler(args)
                 self._instruction_count += 1
 
+    def run(self):
+        while not self._halt:
+            self.step()
+
     def run_to_line(self, nbr):
         while not self._halt and nbr != self._next_cmd['NBR']:
             self.step()
@@ -334,7 +344,7 @@ class Simulator(object):
             self.step()
 
     def run_interactive(self):
-        self.install_interactive_irq_handlers()
+        self.set_interactive_irq_handlers()
         cmd = None
         while cmd != 'q':
             os.system('cls' if os.name == 'nt' else 'clear')
@@ -344,6 +354,7 @@ class Simulator(object):
                 print 'enter     step'
                 print 'b <pc>    run and break at pc'
                 print 'g <line>  run to line (source)'
+                print 'r         run to halt'
                 print 's <n>     run n steps'
                 print
                 print 'h         show help'
@@ -366,6 +377,8 @@ class Simulator(object):
                     pass
                 else:
                     self.run_to_line(line)
+            elif cmd.startswith('r'):
+                self.run()
             elif cmd.startswith('s'):
                 try:
                     n = int(cmd[1:])
