@@ -109,17 +109,27 @@ class Parser(object):
     def parse_empty(self, match):
         return {'TYPE': 'EMPTY'}
 
-    def generate_code(self):
-        code = []
+    def replace_labels(self):
         for cmd in self._cmds:
-            args = []
             for arg in cmd['ARGS']:
                 if arg['TYPE'] == 'LABEL':
-                    args.append(str(self._labels[arg['LABEL']]))
-                else:
-                    args.append(arg['STR'])
-            code.append('%s %s' % (cmd['COMMAND'], ','.join(args)))
-        return '\n'.join(code)
+                    constant = self._labels[arg['LABEL']]
+                    arg['TYPE'] = 'CONSTANT'
+                    arg['STR'] = str(constant)
+                    arg['CONSTANT'] = constant
+
+    def generate_code(self):
+        self.replace_labels()
+        return '\n'.join([self.command_str(cmd) for cmd in self._cmds])
+
+    @classmethod
+    def command_str(cls, cmd):
+        args = [arg['STR'] for arg in cmd['ARGS']]
+        return '%s %s' % (cmd['COMMAND'], ','.join(args))
+
+    def program(self):
+        self.replace_labels()
+        return self._cmds
     
 if __name__ == '__main__':
     if len(sys.argv) == 2:
