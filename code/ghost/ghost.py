@@ -125,7 +125,7 @@ class Parser(object):
     @classmethod
     def command_str(cls, cmd):
         args = [arg['STR'] for arg in cmd['ARGS']]
-        return '%s %s' % (cmd['COMMAND'], ','.join(args))
+        return ('%s %s' % (cmd['COMMAND'], ','.join(args))).ljust(25) + ('; %d' % cmd['NBR'])
 
     def program(self):
         self.replace_labels()
