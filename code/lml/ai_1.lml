@@ -6,7 +6,7 @@
 ;;  * 4: Fruit location
 ;;  * 5: Lambda-Man starting position
 ;;  * 6: Ghost starting position
-(letrec (init modulo random opposite map lman lmanpos lmandir mapobjdir turncw turnccw notback mhdist abs dirfrom ghostpos ghostdist flee moves sort transform sortedmoves step mapobj findx nextstep)
+(letrec (init modulo random opposite map lman lmanpos lmandir mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist flee moves sort transform sortedmoves filterdir step mapobj findx nextstep)
   (
    ;; init: returns the seed for the PRG, and the step function
    (lambda (ws unused) (tuple 42 step))
@@ -38,11 +38,6 @@
                       (if (< newdir 0)
                           3
                         newdir)))
-   ;; notback: given two dirs and the current, return whichever isn't opposite curr
-   (lambda (d1 d2 curr)
-     (if (eq d1 (print (opposite curr)))
-         d2
-       d1))
    ;; mhdist: given two positions, return manhattan distance
    (lambda (p1 p2)
      (let (x1 y1 x2 y2) ((car p1) (cdr p1) (car p2) (cdr p2))
@@ -161,12 +156,22 @@
                              (cons 40 dir) ; treat as empty
                            (cons 70 dir))))))))))
         (dotrans movelist)))
-   ;; sorted moves: given list of moves, sort them in (fruit, power pill, pill, (empty, lambda-man-start, ghost-start), wall) order
+   ;; sortedmoves: given list of moves, sort them in (fruit, power pill, pill, (empty, lambda-man-start, ghost-start), wall) order
    (lambda (movelist)
      (letrec (pred)
        ((lambda (a b)
           (<= (car a) (car b))))
        (sort (transform movelist) pred)))
+   ;; filterdir: given list of moves and a dir, return list without it
+   (lambda (movelist dir)
+     (letrec (dofilter)
+       ((lambda (lst)
+          (if (atom lst)
+              lst
+            (if (eq (cdr (car lst)) dir)
+                (dofilter (cdr lst))
+              (cons (car lst) (dofilter (cdr lst)))))))
+       (dofilter movelist)))
    ;; step: this is the main ai function, it takes the current ai state and the world state,
    ;; and returns the new ai state and the new direction for lambda-man
    (lambda (ai ws)
@@ -178,17 +183,21 @@
                      (if (atom movelist)
                          ;; OH NOES
                          currdir
-                       ;; Ok, great! Let's do some more checking before deciding.
-                       (let (best rest) ((car movelist) (cdr movelist))
-                            (if (atom rest)
-                                (cdr best)
-                              ;; If there are two moves and they're to the same object, pick at random to avoid getting stuck in loops
-                              (if (eq (car best) (car (car rest)))
-                                  (if (eq rnd 0)
-                                        (notback (cdr best) (cdr (car rest)) currdir)
-                                        (notback (cdr (car rest)) (cdr best) currdir))
-                                ;; Try to avoid backing down on ourselves
-                                (notback (cdr best) (cdr (car rest)) currdir))))
+                       (let (filtered) ((filterdir movelist (opposite currdir)))
+                            (if (atom filtered)
+                                ;; No choice but to go back on ourselves
+                                (opposite currdir)
+                              ;; Ok, great! Let's do some more checking before deciding.
+                              (let (best rest) ((car filtered) (cdr filtered))
+                                   (if (atom rest)
+                                       (cdr best)
+                                     ;; If there are two moves and they're to the same object, pick at random to avoid getting stuck in loops
+                                     ;; Todo: expand to pick at random out of any number of equal things
+                                     (if (eq (car best) (car (car rest)))
+                                         (if (eq rnd 0)
+                                             (cdr best)
+                                           (cdr (car rest)))
+                                       (cdr best))))))
                        )
                    ;; Flee! But not into a wall!
                    (let (d1 d2) ((car fleedir) (cdr fleedir))
