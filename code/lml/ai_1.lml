@@ -282,44 +282,33 @@
    ;; and returns the new ai state and the new direction for lambda-man
    (lambda (ai ws)
      (tuple (random ai)
-            (let (fleedir movelist currdir rnd)
-              ((flee ws) (print (sortedmoves (moves ws))) (print (lmandir ws)) (modulo ai 2))
-                 (if (atom fleedir)
-                     ;; No need to flee. Go to the first direction in the movelist
-                     (if (atom movelist)
-                         ;; OH NOES
-                         currdir
-                       (if (<= (car (car movelist)) 30) ; lower values are more desirable, if the top move is a pill or fruit, go for it!
-                           (cdr (car movelist))
-                         (let (filteredinit) ((sameasfirst (filterdir movelist (opposite currdir))))
-                              (if (atom filteredinit)
-                                  ;; No choice but to go back on ourselves
-                                  (opposite currdir)
-                                (let (filtered) ((if (eq (lmanvit ws) 0) (filterobj filteredinit 3) filteredinit))
-                                     (if (atom filtered)
-                                         ;; Ok, then eat the power..
-                                         (cdr (car filteredinit))
-                                       (if (atom (cdr filtered))
-                                           ;; only one way to go!
-                                           (cdr (car filtered))
-                                         ;; Multiple choices, figure out where it's best to go!
-                                         (let (pills) ((print (findpills ws)))
-                                              (let (randomized) ((print (shuffle filtered pills ai)))
-                                                   (cdr (car randomized)))))))))))
-                   ;; Flee! But not into a wall!
-                   (let (d1 d2) ((car fleedir) (cdr fleedir))
-                        (let (dobj1 dobj2) ((mapobj (map ws) (nextstep (lmanpos ws) d1))
-                                            (mapobj (map ws) (nextstep (lmanpos ws) d2)))
-                             (if (eq dobj1 0)
-                                 (if (eq dobj2 0)
-                                     ;; aagh
-                                     (opposite d1)
-                                   d2)
-                               d1)))
-                   )
-                 )
-            )
-     )
+            (let (fleedir movelist currdir rnd) ((flee ws) (print (sortedmoves (moves ws))) (print (lmandir ws)) (modulo ai 2))
+                 (let (validmoves)
+                   ((if (atom fleedir)
+                        ;; No need to flee. Use the whole movelist
+                        movelist
+                      ;; filter the list to only contain the flee directions
+                      (filterdir (filterdir movelist (opposite (car fleedir))) (opposite (cdr fleedir)))))
+                   (if (atom validmoves)
+                       ;; OH NOES
+                       currdir
+                     (if (<= (car (car validmoves)) 30) ; lower values are more desirable, if the top move is a pill or fruit, go for it!
+                         (cdr (car validmoves))
+                       (let (filteredinit) ((sameasfirst (filterdir validmoves (opposite currdir))))
+                            (if (atom filteredinit)
+                                ;; No choice but to go back on ourselves
+                                (opposite currdir)
+                              (let (filtered) ((if (eq (lmanvit ws) 0) (filterobj filteredinit 3) filteredinit))
+                                   (if (atom filtered)
+                                       ;; Ok, then eat the power..
+                                       (cdr (car filteredinit))
+                                     (if (atom (cdr filtered))
+                                         ;; only one way to go!
+                                         (cdr (car filtered))
+                                       ;; Multiple choices, figure out where it's best to go!
+                                       (let (pills) ((print (findpills ws)))
+                                            (let (randomized) ((print (shuffle filtered pills ai)))
+                                                 (cdr (car randomized)))))))))))))))
    ;; mapobj: access the map at a certain position
    (lambda (map pos)
      (let (x y) ((car pos) (cdr pos))
