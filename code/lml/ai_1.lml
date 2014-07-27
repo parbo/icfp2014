@@ -6,14 +6,14 @@
 ;;  * 4: Fruit location
 ;;  * 5: Lambda-Man starting position
 ;;  * 6: Ghost starting position
-(letrec (init modulo random opposite map lman lmanpos lmandir mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist flee moves sort transform sortedmoves filterdir step mapobj findx nextstep)
+(letrec (init modulo random opposite map lman lmanvit lmanpos lmandir mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist flee moves sort transform sortedmoves filterdir filterobj findpills sameasfirst shuffle step mapobj findx nextstep)
   (
    ;; init: returns the seed for the PRG, and the step function
    (lambda (ws unused) (tuple 42 step))
    ;; modulo: is a % b
    (lambda (a b) (- a  (* b (div a b))))
    ;; random: is a pseudo random generator
-   (lambda (seed) (modulo (* 7 seed) 101))
+   (lambda (seed) (modulo (* 75 seed) 65537)) ; same as ZX Spectrum
    ;; opposite: returns the opposite direction
    (lambda (dir)
      (modulo (+ dir 2) 4))
@@ -21,6 +21,8 @@
    (lambda (ws) (car ws))
    ;; lman: given world state returns the lambda-man's state
    (lambda (ws) (car (cdr ws)))
+   ;; lmanvit: given world state returns the vitality of lambda-man
+   (lambda (ws) (car (lman ws)))
    ;; lmanpos: given world state returns the position of lambda-man
    (lambda (ws) (car (cdr (lman ws))))
    ;; lmandir: given world state returns the position of lambda-man
@@ -172,6 +174,110 @@
                 (dofilter (cdr lst))
               (cons (car lst) (dofilter (cdr lst)))))))
        (dofilter movelist)))
+   ;; filterobj: given list of moves and an obj, return list without it
+   (lambda (movelist obj)
+     (letrec (dofilter)
+       ((lambda (lst)
+          (if (atom lst)
+              lst
+            (if (eq (car (car lst)) obj)
+                (dofilter (cdr lst))
+              (cons (car lst) (dofilter (cdr lst)))))))
+       (dofilter movelist)))
+   ;; findpills: given ws, returns how many there are in each direction
+   (lambda (ws)
+     (letrec (sumdir getdists getpills)
+       ((lambda (pills dir)
+          (letrec (dosumdir)
+            ((lambda (lst c)
+               (if (atom lst)
+                   c
+                 (if (eq dir 0) ;; up
+                     (if (> (cdr (car lst)) 0)
+                         (dosumdir (cdr lst) (+ c 1))
+                       (dosumdir (cdr lst) c))
+                   (if (eq dir 1) ;; right
+                       (if (< (car (car lst)) 0)
+                           (dosumdir (cdr lst) (+ c 1))
+                         (dosumdir (cdr lst) c))
+                     (if (eq dir 3) ;; down
+                         (if (< (cdr (car lst)) 0)
+                             (dosumdir (cdr lst) (+ c 1))
+                           (dosumdir (cdr lst) c))
+                       (if (eq dir 0) ;; left
+                           (if (> (cdr (car lst)) 0)
+                               (dosumdir (cdr lst) (+ c 1))
+                             (dosumdir (cdr lst) c))
+                         ;; this should never happen!
+                         c)))))))
+            (dosumdir pills 0)))
+        (lambda (p)
+          (letrec (lmp dodist)
+            ((lmanpos ws)
+             (lambda (lst)
+               (if (atom lst)
+                   lst
+                 (cons (cons (- (car lmp) (car (car lst)))
+                             (- (cdr lmp) (cdr (car lst))))
+                       (dodist (cdr lst))))))
+            (dodist p)))
+        (lambda (m)
+          (letrec (walky walkx)
+            ((lambda (rows y pills)
+               (if (atom rows)
+                   pills
+                 (let (newpills) ((walkx (car rows) 0 y pills))
+                      (walky (cdr rows) (+ y 1) newpills))))
+             (lambda (row x y pills)
+               (if (atom row)
+                   pills
+                 (if (eq (car row) 2)
+                     (cons (cons x y) (walkx (cdr row) (+ x 1) y pills))
+                   (walkx (cdr row) (+ x 1) y pills)))))
+            (walky m 0 0))))
+          (let (dists) ((getdists (getpills (map ws))))
+               (list (cons 0 (sumdir dists 0))
+                     (cons 1 (sumdir dists 1))
+                     (cons 2 (sumdir dists 2))
+                     (cons 3 (sumdir dists 3))))))
+   ;; sameasfirst: takes a list of moves, then returns the list of moves which has the same map object as the first and the length of it
+   (lambda (movelist)
+     (if (atom movelist)
+         movelist
+       (let (first) ((car (car movelist)))
+            (letrec (filter)
+              ((lambda (lst)
+                 (if (atom lst)
+                     lst
+                   (if (eq (car (car lst)) first)
+                       (cons (car lst) (filter (cdr lst)))
+                     (filter (cdr lst))))))
+              (filter movelist)))))
+   ;; shuffle: takes a moves list, and returns a list randomized according to the weights
+   (lambda (lst1 weights rndseed)
+     (if (atom lst1)
+         lst1
+       (if (atom (cdr lst1)) ;; only one element, pointless to do anything
+           lst1
+         (letrec (doshuffle applyrandomizedweights getweight)
+           ((lambda (movelist)
+              (letrec (pred)
+                ((lambda (a b)
+                   (>= (car a) (car b))))
+                (sort movelist pred)))
+            (lambda (lst seed)
+              (if (atom lst)
+                  lst
+                (let (w rnd) ((print (getweight weights (cdr (car lst)))) (random seed))
+                     (cons (cons (modulo rnd (+ w 5)) (cdr (car lst))) ; Add some to w, to avoid divzerro and to give low values a bit higher chance
+                           (applyrandomizedweights (cdr lst) rnd)))))
+            (lambda (lst dir)
+              (if (atom lst)
+                  lst
+                (if (eq (car (car lst)) dir)
+                    (cdr (car lst))
+                  (getweight (cdr lst) dir)))))
+           (doshuffle (print (applyrandomizedweights lst1 rndseed)))))))
    ;; step: this is the main ai function, it takes the current ai state and the world state,
    ;; and returns the new ai state and the new direction for lambda-man
    (lambda (ai ws)
@@ -183,22 +289,23 @@
                      (if (atom movelist)
                          ;; OH NOES
                          currdir
-                       (let (filtered) ((filterdir movelist (opposite currdir)))
-                            (if (atom filtered)
-                                ;; No choice but to go back on ourselves
-                                (opposite currdir)
-                              ;; Ok, great! Let's do some more checking before deciding.
-                              (let (best rest) ((car filtered) (cdr filtered))
-                                   (if (atom rest)
-                                       (cdr best)
-                                     ;; If there are two moves and they're to the same object, pick at random to avoid getting stuck in loops
-                                     ;; Todo: expand to pick at random out of any number of equal things
-                                     (if (eq (car best) (car (car rest)))
-                                         (if (eq rnd 0)
-                                             (cdr best)
-                                           (cdr (car rest)))
-                                       (cdr best))))))
-                       )
+                       (if (<= (car (car movelist)) 30) ; lower values are more desirable, if the top move is a pill or fruit, go for it!
+                           (cdr (car movelist))
+                         (let (filteredinit) ((sameasfirst (filterdir movelist (opposite currdir))))
+                              (if (atom filteredinit)
+                                  ;; No choice but to go back on ourselves
+                                  (opposite currdir)
+                                (let (filtered) ((if (eq (lmanvit ws) 0) (filterobj filteredinit 3) filteredinit))
+                                     (if (atom filtered)
+                                         ;; Ok, then eat the power..
+                                         (cdr (car filteredinit))
+                                       (if (atom (cdr filtered))
+                                           ;; only one way to go!
+                                           (cdr (car filtered))
+                                         ;; Multiple choices, figure out where it's best to go!
+                                         (let (pills) ((print (findpills ws)))
+                                              (let (randomized) ((print (shuffle filtered pills ai)))
+                                                   (cdr (car randomized)))))))))))
                    ;; Flee! But not into a wall!
                    (let (d1 d2) ((car fleedir) (cdr fleedir))
                         (let (dobj1 dobj2) ((mapobj (map ws) (nextstep (lmanpos ws) d1))
