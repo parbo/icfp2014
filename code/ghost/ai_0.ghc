@@ -112,6 +112,19 @@ sub b,1
 test_valid_move:
 int 7
 jeq #alternate_move,a,0  ; Is the new position a wall?
+
+; Table of opposite directions
+mov [4],2  ; Down
+mov [5],3  ; Left
+mov [6],0  ; Up
+mov [7],1  ; Right
+
+mov e,4
+add e,d
+
+; Trying to change to opposite direction?
+jeq #alternate_move,[e],[202]
+
 jeq #domove,0,0
 
 alternate_move:
