@@ -6,7 +6,7 @@
 ;;  * 4: Fruit location
 ;;  * 5: Lambda-Man starting position
 ;;  * 6: Ghost starting position
-(letrec (init modulo random opposite map lman lmanvit lmanpos lmandir anyfruit mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist reverse search flee moves sort transform sortedmoves filterdir filterobj findpills sameasfirst shuffle step mapobj findx nextstep)
+(letrec (init modulo random opposite map lman lmanvit lmanpos lmandir anyfruit mhdist abs ghostpos ghostdist reverse search flee moves sort transform sortedmoves filterdir filterobj findpills sameasfirst shuffle step mapobj findx nextstep)
   (
    ;; init: returns the seed for the PRG, and the step function
    (lambda (ws unused) (tuple (tuple 42 0) step))
@@ -29,19 +29,6 @@
    (lambda (ws) (car (cdr (cdr (lman ws)))))
    ;; anyfruit: given world state returns the fruit status
    (lambda (ws) (cdr (cdr (cdr ws))))
-   ;; mapobjdir: given world state and a direction, returns what's on the map in that direction for lambda-man
-   ;; FIXME: something is wrong with this..
-   (lambda (ws dir) (mapobj (map ws) (nextstep (lmanpos ws) dir)))
-   ;; turncw: given a direction, returns the next clock-wise direction
-   (lambda (dir) (let (newdir) ((+ 1 dir))
-                      (if (> newdir 3)
-                          0
-                        newdir)))
-   ;; turnccw: given a direction, returns the next counter clock-wise direction
-   (lambda (dir) (let (newdir) ((- dir 1))
-                      (if (< newdir 0)
-                          3
-                        newdir)))
    ;; mhdist: given two positions, return manhattan distance
    (lambda (p1 p2)
      (let (x1 y1 x2 y2) ((car p1) (cdr p1) (car p2) (cdr p2))
@@ -55,11 +42,6 @@
    ;; abs: returns absolute value
    (lambda (x)
      (if (< x 0) (* x -1) x))
-   ;; dirfrom: given two positions, return a pair of general directions (up, down, left right)
-   (lambda (p1 p2)
-     (let (x1 y1 x2 y2) ((car p1) (cdr p1) (car p2) (cdr p2))
-          (let (xdist ydist) ((- x1 x2) (- y1 y2))
-               (tuple (if (> xdist 0) 3 1) (if (> ydist 0) 0 2)))))
    ;; ghostpos: given world state, returns list of ghosts' positions
    (lambda (ws)
      (letrec (ghosts getpos)
@@ -72,14 +54,13 @@
                       (getpos (cdr g)))
               (getpos (cdr g))))))
        (getpos ghosts)))
-   ;; ghostdist: given list of ghost statuses and a position, return list of (manhattandistance, directions, position) tuples
-   ;;            note: the direction is the direction away from the ghost
+   ;; ghostdist: given list of ghost statuses and a position, return list of (manhattandistance, position) tuples
    (lambda (gl pos)
      (letrec (getmdd)
        ((lambda (g)
           (if (atom g)
               g
-            (cons (tuple (mhdist (car g) pos) (dirfrom (car g) pos) (car g))
+            (cons (tuple (mhdist (car g) pos) (car g))
                   (getmdd (cdr g) pos)))))
        (getmdd gl pos)))
    ;; reverse: reverse a list
@@ -125,10 +106,9 @@
        ((lambda (g)
           (if (atom g)
               -1
-            (let (mh dirs pos)
+            (let (mh pos)
               ((car (car g))
-               (car (cdr (car g)))
-               (cdr (cdr (car g))))
+               (cdr (car g)))
                  (if (< mh 5) ;; maybe flee if ghost is closer than this
                      ;; do an exhaustive search with max depth mh
                      (let (paths) ((search ws (lmanpos ws) pos (+ mh 1)))
