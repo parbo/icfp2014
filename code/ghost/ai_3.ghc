@@ -99,19 +99,31 @@ mov f,228   ; dy table offset
 add f,d
 add b,[f]   ; y + dy
 
-int 7  ; Fetch map contents
-jeq #test_next_move,a,0  ; Wall?
-;jeq #,a,2  ; Pill?
-
 ; Trying to move in opposite direction?
 mov c,4
 add c,d
 jeq #test_next_move,[c],[82]
 
+int 7  ; Fetch map contents
+jeq #test_next_move,a,0  ; Wall?
+jeq #pill,a,2            ; Pill?
+jeq #move_is_valid,0,0
+
+pill:
+mov [g],d
+inc g
+inc [84]
+
 ; Move is valid
+move_is_valid:
 mov [e],d
 inc e
 inc [83]
+
+; Add move to pill square twice
+mov [g],d
+inc g
+inc [84]
 
 test_next_move:
 inc d
@@ -237,10 +249,10 @@ jeq #halt,0,0
 randommove:
 mov a,[96]  ; PRNG state -> a
 mov b,[96]  ; PRNG state -> b
-div a,[83]
-mul a,[83]
+div a,[84]
+mul a,[84]
 sub b,a     ; (PRNG state) mod (valid moves) -> b
-add b,64    ; Table of valid moves
+add b,68    ; Table of random move options
 mov a,[b]
 int 0
 jeq #halt,0,0
