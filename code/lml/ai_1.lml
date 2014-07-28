@@ -121,15 +121,29 @@
        (getdir (ghostdist (ghostpos ws) (lmanpos ws)))))
    ;; moves: given world state, returns a list of map objects and their directions (walls are excluded)
    (lambda (ws)
-     (letrec (getobjs)
+     (letrec (getobjs checkghost)
        ((lambda (dirs)
           (if (atom dirs)
               dirs
-            (let (obj) ((mapobj (map ws) (nextstep (lmanpos ws) (car dirs))))
-                 (if (eq obj 0)
-                     (getobjs (cdr dirs))
-                   (cons (tuple obj (car dirs))
-                         (getobjs (cdr dirs))))))))
+            (let (newpos) ((nextstep (lmanpos ws) (car dirs)))
+                 (let (obj) ((mapobj (map ws) newpos))
+                      (if (eq obj 0)
+                          (getobjs (cdr dirs))
+                        (if (eq (checkghost newpos) 1) ; moving to ghost position is invalid
+                            (getobjs (cdr dirs))
+                          (cons (tuple obj (car dirs))
+                                (getobjs (cdr dirs)))))))))
+        (lambda (pos)
+          (letrec (docheck)
+            ((lambda (lst)
+               (if (atom lst)
+                   0
+                 (if (eq (car pos) (car (car lst)))
+                     (if (eq (cdr pos) (cdr (car lst)))
+                         1
+                       (docheck (cdr lst)))
+                   (docheck (cdr lst))))))
+            (docheck (ghostpos ws)))))
        (getobjs (list 0 1 2 3))))
    ;; sort: bubble-sorts a list using the supplied predicate
    ;;       adapted from: http://www.cs.toronto.edu/~dianaz/Example_LispPart1.html
