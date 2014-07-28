@@ -284,21 +284,29 @@
              (lambda (a b)
                (<= (cdr a) (cdr b))))
             (sort (dodist p) pred)))
-        (lambda (m)
+        (lambda (m startx starty)
           (letrec (walky walkx)
-            ((lambda (rows y pills)
+            ((lambda (rows y pills sx sy)
                (if (atom rows)
                    pills
-                 (let (newpills) ((walkx (car rows) 0 y pills))
-                      (walky (cdr rows) (+ y 1) newpills))))
-             (lambda (row x y pills)
+                 (if (>= y sy)
+                     (if (< (- y sy) 20)
+                         (let (newpills) ((walkx (car rows) 0 y pills sx))
+                              (walky (cdr rows) (+ y 1) newpills sx sy))
+                       pills) ; outside area, return what we have
+                   (walky (cdr rows) (+ y 1) pills sx sy))))
+             (lambda (row x y pills sx)
                (if (atom row)
                    pills
-                 (if (eq (car row) 2)
-                     (cons (cons x y) (walkx (cdr row) (+ x 1) y pills))
-                   (walkx (cdr row) (+ x 1) y pills)))))
-            (walky m 0 0))))
-       (let (pills) ((getpills (map ws)))
+                 (if (>= x sx)
+                     (if (< (- x sx) 20)
+                         (if (eq (car row) 2)
+                             (cons (cons x y) (walkx (cdr row) (+ x 1) y pills sx))
+                           (walkx (cdr row) (+ x 1) y pills sx))
+                       pills) ; outside area, return what we have
+                   (walkx (cdr row) (+ x 1) y pills sx)))))
+            (walky m 0 0 startx starty))))
+       (let (pills) ((getpills (map ws) (- (car (lmanpos ws)) 10) (- (cdr (lmanpos ws)) 10)))
           (let (dists posandmh) ((getdists pills) (getposandmh pills))
                (tuple posandmh
                       (list (cons 0 (sumdir dists 0))
@@ -379,7 +387,7 @@
                                      (cons (cdr (car filtered)) 0)
                                    ;; Multiple choices, figure out where it's best to go!
                                    (let (pills) ((findpills ws))
-                                        (let (mh) ((cdr (car (car pills))))
+                                        (let (mh) ((if (atom (car pills)) 9999 (cdr (car (car pills)))))
                                              (if (< mh 6) ; pills are close
                                                  (let (paths) ((search ws (lmanpos ws) (car (car (car pills))) (+ mh 1)))
                                                       (if (atom paths)
