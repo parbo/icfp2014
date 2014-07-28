@@ -6,10 +6,10 @@
 ;;  * 4: Fruit location
 ;;  * 5: Lambda-Man starting position
 ;;  * 6: Ghost starting position
-(letrec (init modulo random opposite map lman lmanvit lmanpos lmandir anyfruit mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist search flee moves sort transform sortedmoves filterdir filterobj findpills sameasfirst shuffle step mapobj findx nextstep)
+(letrec (init modulo random opposite map lman lmanvit lmanpos lmandir anyfruit mapobjdir turncw turnccw mhdist abs dirfrom ghostpos ghostdist reverse search flee moves sort transform sortedmoves filterdir filterobj findpills sameasfirst shuffle step mapobj findx nextstep)
   (
    ;; init: returns the seed for the PRG, and the step function
-   (lambda (ws unused) (tuple 42 step))
+   (lambda (ws unused) (tuple (tuple 42 0) step))
    ;; modulo: is a % b
    (lambda (a b) (- a  (* b (div a b))))
    ;; random: is a pseudo random generator
@@ -82,27 +82,43 @@
             (cons (tuple (mhdist (car g) pos) (dirfrom (car g) pos) (car g))
                   (getmdd (cdr g) pos)))))
        (getmdd gl pos)))
+   ;; reverse: reverse a list
+   (lambda (lst)
+     (letrec (dorev)
+       ((lambda (l a)
+          (if (atom l)
+              a
+            (dorev (cdr l) (cons (car l) a)))))
+       (dorev lst 0)))
    ;; search: do a breadth-first search for pos2 from pos1, and limit after limit moves. Returns a list of path lengths.
    (lambda (ws pos1 pos2 max)
-     (letrec (dosearch expand lte)
-       ((lambda (p1 p2 depth limit sofar)
+     (letrec (dosearch expand lte fixuppaths)
+       ((lambda (p1 p2 depth limit sofar path)
           (if (eq depth limit)
               sofar
             (if (eq (mapobj (map ws) p1) 0) ; wall
                 sofar
               (if (eq (car p1) (car p2))
                   (if (eq (cdr p1) (cdr p2))
-                      (cons depth sofar)
-                    (expand p1 p2 (+ depth 1) limit sofar))
-                (expand p1 p2 (+ depth 1) limit sofar)))))
-        (lambda (pp1 pp2 d l sf)
-          (let (nsf0) ((dosearch (nextstep pp1 0) pp2 d l sf))
-               (let (nsf1) ((dosearch (nextstep pp1 1) pp2 d l nsf0))
-                    (let (nsf2) ((dosearch (nextstep pp1 2) pp2 d l nsf1))
-                         (dosearch (nextstep pp1 3) pp2 d l nsf2)))))
+                      (cons (cons depth path) sofar)
+                    (expand p1 p2 (+ depth 1) limit sofar path))
+                (expand p1 p2 (+ depth 1) limit sofar path)))))
+        (lambda (pp1 pp2 d l sf pth)
+          (let (nsf0) ((dosearch (nextstep pp1 0) pp2 d l sf (cons 0 pth)))
+               (let (nsf1) ((dosearch (nextstep pp1 1) pp2 d l nsf0 (cons 1 pth)))
+                    (let (nsf2) ((dosearch (nextstep pp1 2) pp2 d l nsf1 (cons 2 pth)))
+                         (dosearch (nextstep pp1 3) pp2 d l nsf2 (cons 3 pth))))))
         (lambda (a b)
-          (<= a b)))
-       (sort (dosearch pos1 pos2 0 max 0) lte)))
+          (<= (car a) (car b)))
+        (lambda (plist)
+          (letrec (doit)
+            ((lambda (pl)
+               (if (atom pl)
+                   pl
+                 (cons (cons (car (car pl)) (reverse (cdr (car pl))))
+                       (doit (cdr pl))))))
+            (doit plist))))
+       (sort (fixuppaths (dosearch pos1 pos2 0 max 0 0)) lte)))
    ;; flee: given the world state, returns the direction tuple to flee or -1 if there is no need to flee
    (lambda (ws)
      (letrec (getdir)
@@ -115,7 +131,7 @@
                (cdr (cdr (car g))))
                  (if (< mh 4) ;; maybe flee if ghost is closer than this
                      ;; do an exhaustive search with max depth 4
-                     (let (paths) ((print (search ws pos (lmanpos ws) 4)))
+                     (let (paths) ((search ws pos (lmanpos ws) (+ mh 1)))
                           (if (atom paths)
                               ;; no path found, we're safe
                               (getdir (cdr g))
@@ -221,7 +237,7 @@
        (dofilter movelist)))
    ;; findpills: given ws, returns how many there are in each direction
    (lambda (ws)
-     (letrec (sumdir getdists getpills)
+     (letrec (sumdir getdists getposandmh getpills)
        ((lambda (pills dir)
           (letrec (dosumdir)
             ((lambda (lst c)
@@ -256,6 +272,18 @@
                              (- (cdr lmp) (cdr (car lst))))
                        (dodist (cdr lst))))))
             (dodist p)))
+        ;; getposandmh returns pill positions sorted on mh
+        (lambda (p)
+          (letrec (lmp dodist pred)
+            ((lmanpos ws)
+             (lambda (lst)
+               (if (atom lst)
+                   lst
+                 (cons (cons (car lst) (mhdist (car lst) lmp))
+                       (dodist (cdr lst)))))
+             (lambda (a b)
+               (<= (cdr a) (cdr b))))
+            (sort (dodist p) pred)))
         (lambda (m)
           (letrec (walky walkx)
             ((lambda (rows y pills)
@@ -270,11 +298,13 @@
                      (cons (cons x y) (walkx (cdr row) (+ x 1) y pills))
                    (walkx (cdr row) (+ x 1) y pills)))))
             (walky m 0 0))))
-          (let (dists) ((getdists (getpills (map ws))))
-               (list (cons 0 (sumdir dists 0))
-                     (cons 1 (sumdir dists 1))
-                     (cons 2 (sumdir dists 2))
-                     (cons 3 (sumdir dists 3))))))
+       (let (pills) ((getpills (map ws)))
+          (let (dists posandmh) ((getdists pills) (getposandmh pills))
+               (tuple posandmh
+                      (list (cons 0 (sumdir dists 0))
+                            (cons 1 (sumdir dists 1))
+                            (cons 2 (sumdir dists 2))
+                            (cons 3 (sumdir dists 3))))))))
    ;; sameasfirst: takes a list of moves, then returns the list of moves which has the same map object as the first and the length of it
    (lambda (movelist)
      (if (atom movelist)
@@ -303,7 +333,7 @@
             (lambda (lst seed)
               (if (atom lst)
                   lst
-                (let (w rnd) ((print (getweight weights (cdr (car lst)))) (random seed))
+                (let (w rnd) ((getweight weights (cdr (car lst))) (random seed))
                      (cons (cons (modulo rnd (+ w 5)) (cdr (car lst))) ; Add some to w, to avoid divzerro and to give low values a bit higher chance
                            (applyrandomizedweights (cdr lst) rnd)))))
             (lambda (lst dir)
@@ -312,38 +342,58 @@
                 (if (eq (car (car lst)) dir)
                     (cdr (car lst))
                   (getweight (cdr lst) dir)))))
-           (doshuffle (print (applyrandomizedweights lst1 rndseed)))))))
+           (doshuffle (applyrandomizedweights lst1 rndseed))))))
    ;; step: this is the main ai function, it takes the current ai state and the world state,
    ;; and returns the new ai state and the new direction for lambda-man
    (lambda (ai ws)
-     (tuple (random ai)
-            (let (fleedir movelist currdir rnd) ((flee ws) (print (sortedmoves (moves ws) (anyfruit ws))) (print (lmandir ws)) (modulo ai 2))
-                 (let (validmoves)
-                   ((if (atom fleedir)
-                        ;; No need to flee. Use the whole movelist
-                        movelist
-                      ;; filter the list to only contain the flee directions
-                      (filterdir (filterdir movelist (opposite (car fleedir))) (opposite (cdr fleedir)))))
-                   (if (atom validmoves)
-                       ;; OH NOES
-                       currdir
-                     (if (<= (car (car validmoves)) 30) ; lower values are more desirable, if the top move is a pill or fruit, go for it!
-                         (cdr (car validmoves))
-                       (let (filteredinit) ((sameasfirst (filterdir validmoves (opposite currdir))))
-                            (if (atom filteredinit)
-                                ;; No choice but to go back on ourselves
-                                (opposite currdir)
-                              (let (filtered) ((if (eq (lmanvit ws) 0) (filterobj filteredinit 3) filteredinit))
-                                   (if (atom filtered)
-                                       ;; Ok, then eat the power..
-                                       (cdr (car filteredinit))
-                                     (if (atom (cdr filtered))
-                                         ;; only one way to go!
-                                         (cdr (car filtered))
-                                       ;; Multiple choices, figure out where it's best to go!
-                                       (let (pills) ((print (findpills ws)))
-                                            (let (randomized) ((print (shuffle filtered pills ai)))
-                                                 (cdr (car randomized)))))))))))))))
+     (let (res)
+       ((letrec (fleedir movelist currdir rnd cp std)
+          ((flee ws) (sortedmoves (moves ws) (anyfruit ws)) (lmandir ws) (modulo (car ai) 2) (print (cdr ai))
+           (lambda (unused)
+             (let (validmoves)
+               ((if (atom fleedir)
+                    ;; No need to flee. Use the whole movelist
+                    movelist
+                  ;; filter the list to only contain the flee directions
+                  (filterdir (filterdir movelist (opposite (car fleedir))) (opposite (cdr fleedir)))))
+               (if (atom validmoves)
+                   ;; OH NOES
+                   (cons currdir 0)
+                 (if (<= (car (car validmoves)) 30) ; lower values are more desirable, if the top move is a pill or fruit, go for it!
+                     (cons (cdr (car validmoves)) 0)
+                   (let (filteredinit) ((sameasfirst (filterdir validmoves (opposite currdir))))
+                        (if (atom filteredinit)
+                            ;; No choice but to go back on ourselves
+                            (cons (opposite currdir) 0)
+                          (let (filtered) ((if (eq (lmanvit ws) 0) (filterobj filteredinit 3) filteredinit))
+                               (if (atom filtered)
+                                   ;; Ok, then eat the power..
+                                   (cons (cdr (car filteredinit)) 0)
+                                 (if (atom (cdr filtered))
+                                     ;; only one way to go!
+                                     (cons (cdr (car filtered)) 0)
+                                   ;; Multiple choices, figure out where it's best to go!
+                                   (let (pills) ((findpills ws))
+                                        (let (mh) ((print (cdr (car (car pills)))))
+                                             (if (< mh 6) ; pills are close
+                                                 (let (paths) ((search ws (print (lmanpos ws)) (print (car (car (car pills)))) (+ mh 1)))
+                                                      (if (atom (print paths))
+                                        ; no path found, use weighted random
+                                                          (let (randomized) ((shuffle filtered (cdr pills) (car ai)))
+                                                               (cons (cdr (car randomized)) 0))
+                                        ; follow the path
+                                                        (cons (print (car (cdr (print (car paths))))) (cdr (cdr (car paths))))))
+                                        ; no pills close, use weighted random
+                                               (let (randomized) ((shuffle filtered (cdr pills) (car ai)))
+                                                    (cons (cdr (car randomized)) 0)))))))))))))))
+             (if (atom cp)
+                 (std 0)
+               (if (atom fleedir)
+                                        ; just follow the path
+                   cp
+                 ;; don't follow path when fleeing!
+                 (std 0)))))
+       (tuple (tuple (random (car ai)) (cdr res)) (car res))))
    ;; mapobj: access the map at a certain position
    (lambda (map pos)
      (let (x y) ((car pos) (cdr pos))
