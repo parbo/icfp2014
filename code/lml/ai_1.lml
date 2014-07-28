@@ -355,7 +355,12 @@
                     ;; No need to flee. Use the whole movelist
                     movelist
                   ;; filter the list to only contain the flee directions
-                  (filterdir (filterdir movelist (opposite (car fleedir))) (opposite (cdr fleedir)))))
+                  (let (fleemoves) ((filterdir (filterdir movelist (opposite (car fleedir))) (opposite (cdr fleedir))))
+                       (if (atom fleemoves)
+                           ;; wth, use any valid move!
+                           movelist
+                         ;; list not empty, use it
+                         fleemoves))))
                (if (atom validmoves)
                    ;; OH NOES
                    (cons currdir 0)
