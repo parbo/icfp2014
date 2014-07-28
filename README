@@ -1,0 +1,18 @@
+This is the submission of team Sir Bedevere the Wise.
+
+Team members:
+  Pär Bohrarper
+  Dan Gerhardsson
+
+To generate the solution, run ./preparesubmit from the root of the project
+
+How we did it:
+
+Looking at the GCC instruction set, it looked like it was geared towards lisp.
+Some googling found it to be very similar to a SECD machine. So we created a
+lisp compiler for it. The lisp dialect is a bit quirky, but it'll do.
+
+In this lisp, we wrote the lambdaman ai. Fun fact: uses the same PRNG as ZX Spectrum.
+
+We also wrote some utils to able to write ghost ai using labels instead of raw
+addresses, and some utilities for debugging/testing ghosts locally.
