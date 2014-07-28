@@ -129,8 +129,8 @@
               ((car (car g))
                (car (cdr (car g)))
                (cdr (cdr (car g))))
-                 (if (< mh 4) ;; maybe flee if ghost is closer than this
-                     ;; do an exhaustive search with max depth 4
+                 (if (< mh 5) ;; maybe flee if ghost is closer than this
+                     ;; do an exhaustive search with max depth mh
                      (let (paths) ((search ws pos (lmanpos ws) (+ mh 1)))
                           (if (atom paths)
                               ;; no path found, we're safe
