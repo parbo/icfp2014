@@ -348,7 +348,7 @@
    (lambda (ai ws)
      (let (res)
        ((letrec (fleedir movelist currdir rnd cp std)
-          ((flee ws) (sortedmoves (moves ws) (anyfruit ws)) (lmandir ws) (modulo (car ai) 2) (print (cdr ai))
+          ((flee ws) (sortedmoves (moves ws) (anyfruit ws)) (lmandir ws) (modulo (car ai) 2) (cdr ai)
            (lambda (unused)
              (let (validmoves)
                ((if (atom fleedir)
@@ -374,15 +374,15 @@
                                      (cons (cdr (car filtered)) 0)
                                    ;; Multiple choices, figure out where it's best to go!
                                    (let (pills) ((findpills ws))
-                                        (let (mh) ((print (cdr (car (car pills)))))
+                                        (let (mh) ((cdr (car (car pills))))
                                              (if (< mh 6) ; pills are close
-                                                 (let (paths) ((search ws (print (lmanpos ws)) (print (car (car (car pills)))) (+ mh 1)))
-                                                      (if (atom (print paths))
+                                                 (let (paths) ((search ws (lmanpos ws) (car (car (car pills))) (+ mh 1)))
+                                                      (if (atom paths)
                                         ; no path found, use weighted random
                                                           (let (randomized) ((shuffle filtered (cdr pills) (car ai)))
                                                                (cons (cdr (car randomized)) 0))
                                         ; follow the path
-                                                        (cons (print (car (cdr (print (car paths))))) (cdr (cdr (car paths))))))
+                                                        (cons (car (cdr (car paths))) (cdr (cdr (car paths))))))
                                         ; no pills close, use weighted random
                                                (let (randomized) ((shuffle filtered (cdr pills) (car ai)))
                                                     (cons (cdr (car randomized)) 0)))))))))))))))
