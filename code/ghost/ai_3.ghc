@@ -1,0 +1,269 @@
+; Strategy:
+;   normal mode -> random walk if far from lambda man
+;               -> chase if close to lambda man
+;   fright mode -> evade
+
+; Get this ghost's index
+; and store it in memory [80]
+int 3
+mov [80],a
+
+; Get current state
+; vitality  -> [81]
+; direction -> [82]
+int 6
+mov [81],a
+mov [82],b
+
+; PRNG state [96], seed with ghost index + 1
+jgt #rnd,[96],0
+mov [96],[80]
+inc [96]
+
+; Update state
+rnd:
+mov a,6  ; Multiply by 7
+mov b,[96]
+
+rndloop:
+add [96],b
+dec a
+jlt #rndloopend,[96],101
+sub [96],101
+
+rndloopend:
+jgt #rndloop,a,0
+
+; Random walk limit (9 + index & 7) -> [128]
+mov [128],9
+mov a,7
+and a,[80]
+add [128],a
+
+; Get current position
+; x -> [97]
+; y -> [98]
+mov a,[80]
+int 5
+mov [97],a
+mov [98],b
+
+; Get lambda man position
+; x -> [99]
+; y -> [100]
+int 1
+mov [99],a
+mov [100],b
+
+; Tables of move displacement
+; dx (offset 224)
+mov [224],0    ; Up
+mov [225],1    ; Right
+mov [226],0    ; Down
+mov [227],255  ; Left
+
+; dy (offset 228)
+mov [228],255  ; Up
+mov [229],0    ; Right
+mov [230],1    ; Down
+mov [231],0    ; Left
+
+; Table of opposite directions
+mov [4],2  ; Down
+mov [5],3  ; Left
+mov [6],0  ; Up
+mov [7],1  ; Right
+
+; Find valid moves
+; Nbr of valid moves: [83]
+; Nbr of random move options: [84]
+; Current move to evaluate: d
+; List of valid moves: e (offset 64)
+; List of random move options: g (offset 68)
+; Map square x:
+; Map square y:
+mov [83],0
+mov [84],0
+mov d,0
+mov e,64
+mov g,68
+
+test_if_valid_move:
+mov a,[97]  ; Current x position -> a
+mov f,224   ; dx table offset
+add f,d
+add a,[f]   ; x + dx
+
+mov b,[98]  ; Current y position -> a
+mov f,228   ; dy table offset
+add f,d
+add b,[f]   ; y + dy
+
+int 7  ; Fetch map contents
+jeq #test_next_move,a,0  ; Wall?
+;jeq #,a,2  ; Pill?
+
+; Trying to move in opposite direction?
+mov c,4
+add c,d
+jeq #test_next_move,[c],[82]
+
+; Move is valid
+mov [e],d
+inc e
+inc [83]
+
+test_next_move:
+inc d
+jlt #test_if_valid_move,d,4
+
+; If less than two valid moves, do nothing.
+jlt #halt,[83],2
+
+; Find horizontal position relative lambda man
+; Horizontal distance to lambda man -> [112]
+; Left of lambda man:  0 -> [113]
+; Right of lambda man: 1 -> [113]
+mov [113],0
+mov [112],[99]
+sub [112],[97]
+
+jlt #vertpos,[97],[99]
+mov [113],1
+mov [112],[97]
+sub [112],[99]
+
+; Find vertical position relative lambda man
+; Vertical distance to lambda man -> [114]
+; Above lambda man: 0 -> [115]
+; Below lambda man: 1 -> [115]
+
+vertpos:
+mov [115],0
+mov [114],[100]
+sub [114],[98]
+jlt #distance,[98],[100]
+mov [115],1
+mov [114],[98]
+sub [114],[100]
+
+distance:
+
+; Total distance -> [129]
+mov [129],[112]
+add [129],[114]
+
+; Find greatest distance
+; Horizontal distance is greater: 0 -> [116]
+; Vertical distance is greater:   2 -> [116]
+
+mov [116],0
+add [116],[113]  ; Use horizontal move (in normal mode)
+mov [117],2
+add [117],[115]  ; Use vertical move as alternative
+jgt #move,[112],[114]
+mov [116],2
+add [116],[115]  ; Use vertical move (in normal mode)
+mov [117],0
+add [117],[113]  ; Use horizontal move as alternative
+
+; Select move
+move:
+
+; If invisible, treat as normal mode.
+jeq #normal_mode,[81],2
+
+; Movement table for fright mode (opposite of normal mode)
+mov [0],3  ; Left
+mov [1],1  ; Right
+mov [2],0  ; Up
+mov [3],2  ; Down
+
+; If fright mode, use the table above
+jeq #trymove,[81],1
+
+; In normal mode
+normal_mode:
+jgt #randommove,[129],[128]  ; Random walk if distance > [128]
+
+; Movement table for normal mode
+mov [0],1  ; Right
+mov [1],3  ; Left
+mov [2],2  ; Down
+mov [3],0  ; Up
+
+; Try the move
+trymove:
+mov c,[116]
+mov d,[c]
+
+; New position
+mov a,[97]  ; x
+mov b,[98]  ; y
+mov e,d
+and e,1
+jeq #vertical_move,e,0
+; Horizontal move
+sub a,d
+add a,2
+jeq #test_valid_move,0,0
+vertical_move:
+add b,d
+sub b,1
+
+test_valid_move:
+int 7
+jeq #alternate_move,a,0  ; Is the new position a wall?
+
+mov e,4
+add e,d
+
+; Trying to change to opposite direction?
+jeq #alternate_move,[e],[82]
+
+jeq #domove,0,0
+
+alternate_move:
+mov c,[117]
+mov d,[c]
+
+domove:
+mov a,d
+int 0
+
+jeq #halt,0,0
+
+; pick a random move
+randommove:
+mov a,[96]  ; PRNG state -> a
+mov b,[96]  ; PRNG state -> b
+div a,[83]
+mul a,[83]
+sub b,a     ; (PRNG state) mod (valid moves) -> b
+add b,64    ; Table of valid moves
+mov a,[b]
+int 0
+jeq #halt,0,0
+
+; Send debug output
+; a: 0
+; b: 0
+; c: 0
+; d: 0
+; e: 0
+; f: 0
+; g: 0
+; h: 0
+debug:
+mov a,0
+mov b,0
+mov c,0
+mov d,0
+mov e,0
+mov f,0
+mov g,0
+mov h,0
+int 8
+
+halt:
+hlt

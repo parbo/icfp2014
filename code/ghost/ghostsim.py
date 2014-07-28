@@ -66,7 +66,7 @@ class Simulator(object):
         for i in range(0, 256, 16):
             s.append(('[%3d]  ' % i) + '  '.join(['%3d' % self._memory[i + j] for j in range(16)]))
         s.append(' ')
-        s.append('pc[%4d]: %s' % (self._pc, ghost.Parser.command_str(self._next_cmd)))
+        s.append('pc[%3d]: %s' % (self._pc, ghost.Parser.command_str(self._next_cmd)))
         return '\n'.join(s)
 
     def set_interactive_irq_handlers(self):
