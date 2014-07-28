@@ -119,7 +119,7 @@
                        (doit (cdr pl))))))
             (doit plist))))
        (sort (fixuppaths (dosearch pos1 pos2 0 max 0 0)) lte)))
-   ;; flee: given the world state, returns the direction tuple to flee or -1 if there is no need to flee
+   ;; flee: given the world state, returns the forbidden dir or -1 if there is no need to flee
    (lambda (ws)
      (letrec (getdir)
        ((lambda (g)
@@ -131,12 +131,12 @@
                (cdr (cdr (car g))))
                  (if (< mh 5) ;; maybe flee if ghost is closer than this
                      ;; do an exhaustive search with max depth mh
-                     (let (paths) ((search ws pos (lmanpos ws) (+ mh 1)))
+                     (let (paths) ((search ws (lmanpos ws) pos (+ mh 1)))
                           (if (atom paths)
                               ;; no path found, we're safe
                               (getdir (cdr g))
                             ;; aagh, flee!
-                            (car (cdr (car g)))))
+                            (car (cdr (car paths)))))
                    (getdir (cdr g)))))))
        (getdir (ghostdist (ghostpos ws) (lmanpos ws)))))
    ;; moves: given world state, returns a list of map objects and their directions (walls are excluded)
@@ -355,15 +355,15 @@
    ;; and returns the new ai state and the new direction for lambda-man
    (lambda (ai ws)
      (let (res)
-       ((letrec (fleedir movelist currdir rnd cp std)
+       ((letrec (forbiddenfleedir movelist currdir rnd cp std)
           ((flee ws) (sortedmoves (moves ws) (anyfruit ws)) (lmandir ws) (modulo (car ai) 2) (cdr ai)
            (lambda (unused)
              (let (validmoves)
-               ((if (atom fleedir)
+               ((if (eq forbiddenfleedir -1)
                     ;; No need to flee. Use the whole movelist
                     movelist
-                  ;; filter the list to only contain the flee directions
-                  (let (fleemoves) ((filterdir (filterdir movelist (opposite (car fleedir))) (opposite (cdr fleedir))))
+                  ;; filter the list to only contain good flee directions
+                  (let (fleemoves) ((filterdir movelist forbiddenfleedir))
                        (if (atom fleemoves)
                            ;; wth, use any valid move!
                            movelist
@@ -401,7 +401,7 @@
                                                     (cons (cdr (car randomized)) 0)))))))))))))))
              (if (atom cp)
                  (std 0)
-               (if (atom fleedir)
+               (if (eq forbiddenfleedir -1)
                                         ; just follow the path
                    cp
                  ;; don't follow path when fleeing!
